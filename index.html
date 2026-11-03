@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NOA マイレッスン</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#1b2230;--sub:#6b7485;--line:#dfe3ea;--acc:#1f5eff;--acc-bg:#e8efff;--ng:#c43d3d}
+:root{--lv-s:#1f9d55;--lv-n:#e0a100;--lv-o:#8b93a3;--lv-x:#4a78d8;--bg:#f6f7f9;--card:#fff;--ink:#1b2230;--sub:#6b7485;--line:#dfe3ea;--acc:#1f5eff;--acc-bg:#e8efff;--ng:#c43d3d}
 @media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ecf3;--sub:#98a1b3;--line:#2b3240;--acc:#6f9bff;--acc-bg:#202c4a;--ng:#ef7a7a}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
@@ -27,6 +27,9 @@ h2{font-size:.95rem;color:var(--sub);margin:18px 0 6px;font-weight:600}
 .les b a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}
 .les b a:hover{border-color:var(--acc);color:var(--acc)}
 .chip input{margin:0 6px 0 0;vertical-align:-1px}
+.lv{display:inline-block;font-size:.75rem;font-weight:600;padding:0 9px;border-radius:999px;color:#fff;margin-right:6px}
+.lv.s{background:var(--lv-s)}.lv.n{background:var(--lv-n);color:#1b2230}.lv.o{background:var(--lv-o)}.lv.x{background:var(--lv-x)}
+.les.s{border-left:5px solid var(--lv-s)}.les.n{border-left:5px solid var(--lv-n)}.les.o{border-left:5px solid var(--lv-o)}.les.x{border-left:5px solid var(--lv-x)}
 .go{grid-row:1/4;grid-column:3;align-self:center;text-decoration:none;color:#fff;background:var(--acc);border-radius:999px;padding:7px 16px;font-size:.9rem;font-weight:600}
 .go.trial{background:var(--sub)}
 .st{color:var(--sub);font-size:.85rem;margin:10px 0}
@@ -46,6 +49,7 @@ textarea{width:100%;min-height:90px;font:inherit;background:var(--card);color:va
 <div class="row" id="gens"></div>
 <div class="row">
   <label class="chip" id="lateLbl"><input type="checkbox" id="late">18時以降のみ</label>
+  <label class="chip"><input type="checkbox" id="high">初級以上も表示</label>
   <button id="reload" type="button">最新に更新</button>
 </div>
 
@@ -78,6 +82,7 @@ const S = {
   day: new Date().getDay(),
   thisMonth: true,
   late: false,
+  high: false,
   ng: store.get("ng", DEFAULT_NG),
   data: null
 };
@@ -141,6 +146,14 @@ function startMin(rec){
   return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
+function levelClass(rec){
+  const n = txt(rec.LEVEL_NAME);
+  if(n.includes("超入門")) return "s";
+  if(n.includes("入門")) return "n";
+  if(/初級|中級|上級/.test(n)) return "o";
+  return "x";
+}
+
 function link(rec){
   if(rec.EVENT_FLG) return null;
   const q = "?tn=" + rec.TENPO_CD + "&g=" + rec.GENRE_CODE + "&l=" + rec.LEVEL_CODE + "&i=" + rec.INSTRUCTOR_CODE +
@@ -166,6 +179,7 @@ function render(){
       (it.time_list || []).forEach(t => (t.record || []).forEach(rec => {
         const id = rec.SEQ != null ? rec.SEQ : null;
         if(id !== null){ if(seen.has(id)) return; seen.add(id); }
+        if(!S.high && levelClass(rec) === "o") return;
         if(S.late){ const sm = startMin(rec); if(sm !== null && sm < 18 * 60) return; }
         if(ng.has(txt(rec.NICKNAME))){ hidden++; return; }
         (byTime[txt(rec.Y_TIME_START)] = byTime[txt(rec.Y_TIME_START)] || []).push(rec);
@@ -177,7 +191,8 @@ function render(){
     const h = document.createElement("h2"); h.textContent = tm; list.appendChild(h);
     byTime[tm].forEach(rec => {
       shown++;
-      const d = document.createElement("div"); d.className = "les";
+      const lc = levelClass(rec);
+      const d = document.createElement("div"); d.className = "les " + lc;
       const name = document.createElement("b");
       const label = txt(rec.NICKNAME) + (rec.TEAM && rec.TEAM !== "null" ? "（" + txt(rec.TEAM) + "）" : "");
       const pu = abs(rec.URL);
@@ -190,7 +205,9 @@ function render(){
       const m1 = document.createElement("span"); m1.className = "meta";
       m1.textContent = txt(rec.Y_TIME_START) + "〜" + txt(rec.Y_TIME_END) + "　" + txt(rec.TENPO_NAME) + (rec.STUDIO_NAME ? " " + txt(rec.STUDIO_NAME) : "");
       const m2 = document.createElement("span"); m2.className = "meta";
-      m2.textContent = [txt(rec.GENRE_SUB_NAME), txt(rec.GENRE2_SUB_NAME), txt(rec.LEVEL_NAME)].filter(Boolean).join(" / ");
+      const ln = txt(rec.LEVEL_NAME);
+      if(ln){ const bd = document.createElement("span"); bd.className = "lv " + lc; bd.textContent = ln; m2.appendChild(bd); }
+      m2.appendChild(document.createTextNode([txt(rec.GENRE_SUB_NAME), txt(rec.GENRE2_SUB_NAME)].filter(Boolean).join(" / ")));
       d.append(ph, name, m1, m2);
       const l = link(rec);
       if(l){ const a = document.createElement("a"); a.className = "go" + l[2]; a.href = l[0]; a.target = "_blank"; a.rel = "noopener"; a.textContent = l[1]; d.appendChild(a); }
@@ -202,6 +219,8 @@ function render(){
 
 $("late").checked = false;
 $("late").onchange = e => { S.late = e.target.checked; render(); };
+$("high").checked = false;
+$("high").onchange = e => { S.high = e.target.checked; render(); };
 $("reload").onclick = load;
 $("ng").value = S.ng.join("\n");
 $("ng").oninput = e => { S.ng = e.target.value.split("\n").map(s => s.trim()).filter(Boolean); store.set("ng", S.ng); render(); };
