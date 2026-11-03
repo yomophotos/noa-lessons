@@ -1,6 +1,6 @@
 import json, os, sys, time, urllib.request, datetime
 
-API = "https://1wzmgkjpc7.execute-api.ap-northeast-1.amazonaws.com/PRD"
+API = "https://r8t00r3qx7.execute-api.ap-northeast-1.amazonaws.com/PRD"
 LOCS = ["10", "7", "2", "12", "11", "13"]   # 都立大 中目黒 恵比寿 原宿 赤坂 自由が丘
 GENS = ["01,18", "09"]                       # HIP-HOP / リズムトレーニング
 OUT = "data.json"
