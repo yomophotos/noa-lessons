@@ -19,10 +19,15 @@ button:focus-visible,a:focus-visible,textarea:focus-visible{outline:2px solid va
 .days{display:flex;gap:6px;margin:16px 0 8px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:1}
 .day{flex:1;border-radius:10px;padding:8px 0;text-align:center}
 h2{font-size:.95rem;color:var(--sub);margin:18px 0 6px;font-weight:600}
-.les{display:grid;grid-template-columns:1fr auto;gap:2px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 8px}
+.les{display:grid;grid-template-columns:52px 1fr auto;gap:2px 12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 8px}
 .les b{font-size:1.02rem}
 .meta{color:var(--sub);font-size:.85rem}
-.go{grid-row:1/3;grid-column:2;align-self:center;text-decoration:none;color:#fff;background:var(--acc);border-radius:999px;padding:7px 16px;font-size:.9rem;font-weight:600}
+.les b,.les .meta{grid-column:2}
+.ph{grid-row:1/4;grid-column:1;width:52px;height:52px;border-radius:50%;object-fit:cover;background:var(--line);align-self:center}
+.les b a{color:inherit;text-decoration:none;border-bottom:1px solid var(--line)}
+.les b a:hover{border-color:var(--acc);color:var(--acc)}
+.chip input{margin:0 6px 0 0;vertical-align:-1px}
+.go{grid-row:1/4;grid-column:3;align-self:center;text-decoration:none;color:#fff;background:var(--acc);border-radius:999px;padding:7px 16px;font-size:.9rem;font-weight:600}
 .go.trial{background:var(--sub)}
 .st{color:var(--sub);font-size:.85rem;margin:10px 0}
 .err{color:var(--ng)}
@@ -40,7 +45,7 @@ textarea{width:100%;min-height:90px;font:inherit;background:var(--card);color:va
 <p class="lbl">ジャンル</p>
 <div class="row" id="gens"></div>
 <div class="row">
-  <button id="month" type="button"></button>
+  <label class="chip" id="lateLbl"><input type="checkbox" id="late">18時以降のみ</label>
   <button id="reload" type="button">最新に更新</button>
 </div>
 
@@ -56,7 +61,7 @@ textarea{width:100%;min-height:90px;font:inherit;background:var(--card);color:va
 </main>
 
 <script>
-const API = "https://1wzmgkjpc7.execute-api.ap-northeast-1.amazonaws.com/PRD";
+const API = "https://r8t00r3qx7.execute-api.ap-northeast-1.amazonaws.com/PRD";
 const SITE = "https://www.noadance.com";
 const LOCS = [["10","都立大"],["7","中目黒"],["2","恵比寿"],["12","原宿"],["11","赤坂"],["13","自由が丘"]];
 const GENS = [["01,18","HIP-HOP"],["09","リズムトレーニング"]];
@@ -72,6 +77,7 @@ const S = {
   gens: new Set(store.get("gens", GENS.map(x => x[0]))),
   day: new Date().getDay(),
   thisMonth: true,
+  late: false,
   ng: store.get("ng", DEFAULT_NG),
   data: null
 };
@@ -112,7 +118,6 @@ function monthLabel(){
 }
 
 async function load(){
-  $("month").textContent = "表示中: " + monthLabel() + "（切替）";
   $("st").textContent = "読み込み中…";
   try{
     const r = await fetch("data.json?t=" + Date.now());
@@ -123,6 +128,17 @@ async function load(){
     S.data = null; $("list").innerHTML = "";
     $("st").innerHTML = '<span class="err">データを読み込めませんでした（' + txt(e.message) + '）。</span>';
   }
+}
+
+function abs(u){
+  u = txt(u);
+  if(!u || u === "null") return null;
+  if(u.startsWith("http")) return u;
+  return SITE + (u.startsWith("/") ? "" : "/") + u;
+}
+function startMin(rec){
+  const m = /(\d{1,2}):(\d{2})/.exec(txt(rec.Y_TIME_START));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
 }
 
 function link(rec){
@@ -150,6 +166,7 @@ function render(){
       (it.time_list || []).forEach(t => (t.record || []).forEach(rec => {
         const id = rec.SEQ != null ? rec.SEQ : null;
         if(id !== null){ if(seen.has(id)) return; seen.add(id); }
+        if(S.late){ const sm = startMin(rec); if(sm !== null && sm < 18 * 60) return; }
         if(ng.has(txt(rec.NICKNAME))){ hidden++; return; }
         (byTime[txt(rec.Y_TIME_START)] = byTime[txt(rec.Y_TIME_START)] || []).push(rec);
       }));
@@ -161,12 +178,20 @@ function render(){
     byTime[tm].forEach(rec => {
       shown++;
       const d = document.createElement("div"); d.className = "les";
-      const name = document.createElement("b"); name.textContent = txt(rec.NICKNAME) + (rec.TEAM && rec.TEAM !== "null" ? "（" + txt(rec.TEAM) + "）" : "");
+      const name = document.createElement("b");
+      const label = txt(rec.NICKNAME) + (rec.TEAM && rec.TEAM !== "null" ? "（" + txt(rec.TEAM) + "）" : "");
+      const pu = abs(rec.URL);
+      if(pu){ const a = document.createElement("a"); a.href = pu; a.target = "_blank"; a.rel = "noopener"; a.textContent = label; name.appendChild(a); } else name.textContent = label;
+      const iu = abs(rec.INSTRUCTOR_IMG);
+      let ph;
+      if(iu){ ph = document.createElement("img"); ph.src = iu; ph.alt = ""; ph.loading = "lazy"; ph.referrerPolicy = "no-referrer"; ph.onerror = () => { ph.style.visibility = "hidden"; }; }
+      else ph = document.createElement("div");
+      ph.className = "ph";
       const m1 = document.createElement("span"); m1.className = "meta";
       m1.textContent = txt(rec.Y_TIME_START) + "〜" + txt(rec.Y_TIME_END) + "　" + txt(rec.TENPO_NAME) + (rec.STUDIO_NAME ? " " + txt(rec.STUDIO_NAME) : "");
       const m2 = document.createElement("span"); m2.className = "meta";
       m2.textContent = [txt(rec.GENRE_SUB_NAME), txt(rec.GENRE2_SUB_NAME), txt(rec.LEVEL_NAME)].filter(Boolean).join(" / ");
-      d.append(name, m1, m2);
+      d.append(ph, name, m1, m2);
       const l = link(rec);
       if(l){ const a = document.createElement("a"); a.className = "go" + l[2]; a.href = l[0]; a.target = "_blank"; a.rel = "noopener"; a.textContent = l[1]; d.appendChild(a); }
       list.appendChild(d);
@@ -175,7 +200,8 @@ function render(){
   $("st").textContent = shown + "件" + (hidden ? "（除外 " + hidden + "件）" : "") + (S.data.updated ? "　一覧の最終変更: " + S.data.updated : "");
 }
 
-$("month").onclick = () => { S.thisMonth = !S.thisMonth; $("month").textContent = "表示中: " + monthLabel() + "（切替）"; render(); };
+$("late").checked = false;
+$("late").onchange = e => { S.late = e.target.checked; render(); };
 $("reload").onclick = load;
 $("ng").value = S.ng.join("\n");
 $("ng").oninput = e => { S.ng = e.target.value.split("\n").map(s => s.trim()).filter(Boolean); store.set("ng", S.ng); render(); };
