@@ -47,9 +47,10 @@ textarea{width:100%;min-height:90px;font:inherit;background:var(--card);color:va
 <div class="row" id="locs"></div>
 <p class="lbl">ジャンル</p>
 <div class="row" id="gens"></div>
+<p class="lbl">レベル（超入門は常に表示）</p>
+<div class="row" id="lvs"></div>
 <div class="row">
   <label class="chip" id="lateLbl"><input type="checkbox" id="late">18時以降のみ</label>
-  <label class="chip"><input type="checkbox" id="high">初級以上も表示</label>
   <button id="reload" type="button">最新に更新</button>
 </div>
 
@@ -70,7 +71,7 @@ const SITE = "https://www.noadance.com";
 const LOCS = [["10","都立大"],["7","中目黒"],["2","恵比寿"],["12","原宿"],["11","赤坂"],["13","自由が丘"]];
 const GENS = [["01,18","HIP-HOP"],["09","リズムトレーニング"]];
 const DAYS = [[1,"月"],[2,"火"],[3,"水"],[4,"木"],[5,"金"],[6,"土"],[0,"日"]];
-const DEFAULT_NG = ["NAOTO","HIROKID","STEZO","shun","motoi","Sora"];
+const DEFAULT_NG = ["NAOTO","HIROKID","STEZO","shun","MOTOI","Sora"];
 
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
@@ -81,8 +82,9 @@ const S = {
   gens: new Set(store.get("gens", GENS.map(x => x[0]))),
   day: new Date().getDay(),
   thisMonth: true,
-  late: false,
-  high: false,
+  late: true,
+  showN: false,
+  showO: false,
   ng: store.get("ng", DEFAULT_NG),
   data: null
 };
@@ -179,7 +181,9 @@ function render(){
       (it.time_list || []).forEach(t => (t.record || []).forEach(rec => {
         const id = rec.SEQ != null ? rec.SEQ : null;
         if(id !== null){ if(seen.has(id)) return; seen.add(id); }
-        if(!S.high && levelClass(rec) === "o") return;
+        const lcl = levelClass(rec);
+        if(lcl === "n" && !S.showN) return;
+        if(lcl === "o" && !S.showO) return;
         if(S.late){ const sm = startMin(rec); if(sm !== null && sm < 18 * 60) return; }
         if(ng.has(txt(rec.NICKNAME))){ hidden++; return; }
         (byTime[txt(rec.Y_TIME_START)] = byTime[txt(rec.Y_TIME_START)] || []).push(rec);
@@ -217,10 +221,15 @@ function render(){
   $("st").textContent = shown + "件" + (hidden ? "（除外 " + hidden + "件）" : "") + (S.data.updated ? "　一覧の最終変更: " + S.data.updated : "");
 }
 
-$("late").checked = false;
+$("late").checked = true;
 $("late").onchange = e => { S.late = e.target.checked; render(); };
-$("high").checked = false;
-$("high").onchange = e => { S.high = e.target.checked; render(); };
+[["showN", "入門"], ["showO", "初級以上"]].forEach(([k, name]) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chip"; b.textContent = name;
+  b.setAttribute("aria-pressed", S[k]);
+  b.onclick = () => { S[k] = !S[k]; b.setAttribute("aria-pressed", S[k]); render(); };
+  $("lvs").appendChild(b);
+});
 $("reload").onclick = load;
 $("ng").value = S.ng.join("\n");
 $("ng").oninput = e => { S.ng = e.target.value.split("\n").map(s => s.trim()).filter(Boolean); store.set("ng", S.ng); render(); };
